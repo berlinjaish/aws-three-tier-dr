@@ -1,293 +1,189 @@
-\# AWS Three-Tier Architecture with Cross-Region Disaster Recovery
+# AWS Three-Tier Architecture with Cross-Region Disaster Recovery
 
+## Project Overview
 
+This project demonstrates a three-tier web application architecture on AWS, provisioned using Terraform, with a cross-region Disaster Recovery (DR) approach.
 
-\## Project Overview
-
-
-
-This project focuses on designing and implementing a secure, scalable, and highly available three-tier web application architecture on Amazon Web Services (AWS), provisioned entirely using Terraform.
-
-
-
-The architecture separates the application into Presentation, Application, and Database layers. It also incorporates a cross-region Disaster Recovery strategy to improve business continuity and data protection.
-
-
+The primary application runs in Mumbai (`ap-south-1`). A backup-and-restore DR environment is configured in Hyderabad (`ap-south-2`).
 
 ## Architecture
 
+![AWS Three-Tier Architecture](docs/architecture.png)
 
-![AWS Three-Tier Architecture with Disaster Recovery](docs/architecture.png)
+- **Primary Region:** Mumbai (`ap-south-1`)
+- **DR Region:** Hyderabad (`ap-south-2`)
+- **Infrastructure as Code:** Terraform
 
-
-
-\*\*Primary Region:\*\* Mumbai (`ap-south-1`)
-
-
-
-\*\*Disaster Recovery Region:\*\* Hyderabad (`ap-south-2`)
-
-
-
-Architecture diagram: `docs/architecture.png`
-
-
-
-\## AWS Services Used
-
-
-
-| Category | AWS Services |
-
-|---|---|
-
-| Networking | VPC, Subnets, Route Tables, Internet Gateway, NAT Gateway |
-
-| Compute | EC2, Auto Scaling |
-
-| Load Balancing | Application Load Balancer |
-
-| Storage | Amazon S3, EBS |
-
-| Database | Amazon RDS MySQL |
-
-| Content Delivery | CloudFront |
-
-| Security | IAM, Security Groups |
-
-| Monitoring | CloudWatch |
-
-| Disaster Recovery | AWS Backup, S3 Cross-Region Replication, RDS Snapshots, EC2 AMIs |
-
-
-
-\## Three-Tier Architecture
-
-
-
-\### 1. Presentation Layer
-
-\- Amazon CloudFront
-
-\- Amazon S3
-
-\- Public Application Load Balancer
-
-\- EC2 Web Servers
-
-\- Auto Scaling Group
-
-
-
-\### 2. Application Layer
-
-\- Internal Application Load Balancer
-
-\- EC2 Application Servers
-
-\- Auto Scaling Group
-
-\- Private Subnets
-
-
-
-\### 3. Database Layer
-
-\- Amazon RDS MySQL
-
-\- Private Database Subnets
-
-\- Multi-AZ database deployment
-
-
-
-\## Disaster Recovery Strategy
-
-
-
-The project uses Mumbai as the primary region and Hyderabad as the secondary recovery region.
-
-
-
-Planned recovery mechanisms:
-
-
-
-\- Amazon S3 Cross-Region Replication
-
-\- RDS automated backups and cross-region snapshots
-
-\- EC2 AMI backups
-
-\- EBS snapshots
-
-\- Secondary VPC infrastructure
-
-\- Application restoration and recovery testing
-
-
-
-Initial recovery approach: \*\*Backup and Restore\*\*.
-
-
-
-\## Infrastructure as Code
-
-
-
-Terraform is used to provision and manage AWS infrastructure.
-
-
-
-The project uses reusable Terraform modules to organize infrastructure components and separate primary and disaster recovery configurations.
-
-
-
-\## Project Structure
-
-
+### Primary Architecture Flow
 
 ```text
-
-aws-three-tier-dr/
-
-│
-
-├── modules/
-
-│   ├── vpc/
-
-│   ├── security-groups/
-
-│   ├── alb/
-
-│   ├── ec2/
-
-│   ├── autoscaling/
-
-│   ├── rds/
-
-│   ├── s3/
-
-│   └── cloudfront/
-
-│
-
-├── environments/
-
-│   ├── dev/
-
-│   └── dr/
-
-│
-
-├── screenshots/
-
-├── docs/
-
-├── README.md
-
-└── .gitignore
-
+Internet
+   |
+Public Application Load Balancer
+   |
+Web EC2 Auto Scaling Group
+   |
+Internal Application Load Balancer
+   |
+Application EC2 Auto Scaling Group
+   |
+Amazon RDS MySQL
 ```
 
+### Disaster Recovery Flow
 
+```text
+Mumbai Primary RDS
+       |
+Encrypted RDS Snapshot
+       |
+Cross-Region Snapshot Copy
+       |
+Hyderabad RDS Restore
+       |
+Private Database Connectivity Test
+```
 
-\## Project Status
+## AWS Services Used
 
+| Category | Services |
+|---|---|
+| Networking | VPC, Subnets, Route Tables, Internet Gateway, NAT Gateway |
+| Compute | EC2 |
+| Auto Scaling | EC2 Auto Scaling Groups |
+| Load Balancing | Public and Internal Application Load Balancers |
+| Database | Amazon RDS MySQL |
+| Security | IAM Roles, Security Groups, AWS KMS |
+| Configuration and Secrets | AWS Systems Manager Parameter Store |
+| Disaster Recovery | RDS Snapshots, Cross-Region Snapshot Copy |
+| Infrastructure as Code | Terraform |
+| CLI | AWS CLI |
 
+## Primary Region — Mumbai
 
-\*\*Status: In Progress\*\*
+- VPC CIDR: `10.0.0.0/16`
+- Public and private subnet architecture.
+- Public Application Load Balancer.
+- Web EC2 Auto Scaling Group with two instances.
+- Internal Application Load Balancer.
+- Application EC2 Auto Scaling Group with two instances.
+- Amazon RDS MySQL in private database subnets.
+- NAT Gateway for outbound connectivity.
+- Database password stored in Systems Manager Parameter Store as SecureString.
+- IAM instance roles for AWS access.
 
+### Primary RDS Configuration
 
+- Engine: MySQL 8.4
+- Instance class: `db.t3.micro`
+- Storage: 20 GiB gp3
+- Encryption: Enabled
+- Public access: Disabled
+- Deployment: Single-AZ
 
-Implementation will be completed in phases:
+## Disaster Recovery — Hyderabad
 
+- DR Region: `ap-south-2`
+- DR VPC CIDR: `10.1.0.0/16`
+- Private database subnets.
+- Database security group and DB subnet group.
+- Encrypted cross-region RDS snapshot copy.
+- Restored MySQL database in Hyderabad.
+- Database connectivity and authentication tested successfully.
 
+**DR approach:** Backup and Restore.
 
-\- \[ ] Terraform configuration
+The current DR environment covers database restoration and connectivity testing. It does not yet include a complete web/application stack or automated failover.
 
-\- \[ ] Primary VPC and networking
+## Recovery Validation
 
-\- \[ ] Presentation layer
+The following tests were performed:
 
-\- \[ ] Application layer
+- Primary application endpoints `/`, `/app/`, and `/db` returned HTTP 200.
+- Primary RDS instance reached Available status.
+- Encrypted RDS snapshot copied to Hyderabad.
+- DR RDS instance restored and reached Available status.
+- DR database remained private and encrypted.
+- MySQL authentication and connectivity tested from a temporary SSM-managed EC2 instance.
+- Temporary DR test infrastructure was removed after testing.
 
-\- \[ ] Database layer
+**Data recovery limitation:** The restored `appdb` database contained zero tables during validation. Database infrastructure restoration and connectivity were tested, but recovery of actual application table data has not yet been demonstrated.
 
-\- \[ ] CloudFront and S3
+## Terraform Project Structure
 
-\- \[ ] Disaster Recovery infrastructure
+```text
+aws-three-tier-dr/
+│
+├── main.tf
+├── dr.tf
+├── providers.tf
+├── variables.tf
+├── locals.tf
+├── .terraform.lock.hcl
+├── .gitignore
+├── docs/
+│   └── architecture.png
+├── screenshots/
+└── README.md
+```
 
-\- \[ ] Cross-region backup configuration
+## Deployment Commands
 
-\- \[ ] Recovery testing
+Run these commands from the Terraform project directory:
 
-\- \[ ] Monitoring and documentation
+```bash
+terraform init
+terraform fmt -check
+terraform validate
+terraform plan
+terraform apply
+```
 
+Review the Terraform plan carefully before applying changes.
 
+## Security Practices
 
-\## Domain Configuration
+- Use IAM roles instead of hardcoding AWS credentials.
+- Store database passwords in SSM Parameter Store SecureString.
+- Keep databases in private subnets.
+- Restrict traffic using security groups.
+- Encrypt RDS databases and snapshots.
+- Do not commit credentials, `.tfvars` files, Terraform state files, or plan files to GitHub.
 
+## Project Status
 
+**Primary three-tier deployment:** Implemented and tested.
 
-A custom domain and HTTPS configuration using Route 53 and AWS Certificate Manager will be considered in a later phase. Initially, AWS-generated service endpoints will be used.
+**Cross-region database DR:** Snapshot copy, restore, and connectivity testing completed.
 
+**Remaining improvements:**
+- Deploy the web and application tiers in Hyderabad.
+- Demonstrate recovery of actual application database data.
+- Document and test the complete recovery runbook.
+- Measure Recovery Point Objective (RPO) and Recovery Time Objective (RTO).
+- Implement monitoring and alerting.
+- Configure HTTPS and a custom domain.
 
+## Cost Considerations
 
-\## Security Considerations
+AWS resources such as EC2, NAT Gateway, Application Load Balancers, RDS, snapshots, public IPv4 addresses, and cross-region data transfer may incur charges.
 
+Review and clean up resources when they are no longer needed.
 
+## Learning Outcomes
 
-\- Least-privilege IAM permissions
+- AWS VPC and subnet design.
+- Public and private network architecture.
+- Three-tier application deployment.
+- EC2 Auto Scaling and load balancing.
+- Amazon RDS MySQL configuration.
+- IAM and secure parameter management.
+- Terraform infrastructure provisioning.
+- Cross-region RDS snapshot copy and restore.
+- Disaster Recovery validation.
 
-\- Network segmentation using public and private subnets
-
-\- Security groups restricting communication between tiers
-
-\- Database isolation
-
-\- Secure Terraform state management
-
-\- No AWS credentials or sensitive state files committed to GitHub
-
-
-
-\## Screenshots
-
-
-
-Implementation screenshots and testing evidence will be added as the project progresses.
-
-
-
-\## Learning Outcomes
-
-
-
-\- AWS networking and infrastructure architecture
-
-\- Three-tier application design
-
-\- Terraform infrastructure provisioning
-
-\- High availability using multiple Availability Zones
-
-\- Cross-region Disaster Recovery
-
-\- AWS backup and recovery mechanisms
-
-\- Infrastructure security and monitoring
-
-
-
-\## Author
-
-
+## Author
 
 Berlin
 
-
-
-AWS | Terraform | Cloud Infrastructure | Disaster Recovery
-
+AWS | Terraform | DevOps | Cloud Infrastructure | Disaster Recovery

@@ -23,3 +23,22 @@ override.tf.json
 # OS
 Thumbs.db
 .DS_Store
+
+# Terraform working files and sensitive data
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfplan
+crash.log
+crash.*.log
+
+# Local backups and temporary working files
+*.bak
+*.before-*
+*.tfplan
+web-console*.txt
+allow-ssm-run-command.json
+
+# Local logs and generated output
+*.log
