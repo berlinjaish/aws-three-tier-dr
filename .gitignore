@@ -42,3 +42,7 @@ allow-ssm-run-command.json
 
 # Local logs and generated output
 *.log
+
+# Local IAM policy and verification artifacts
+rds-policy-v*.json
+ssm-verify.json
