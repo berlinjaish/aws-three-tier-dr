@@ -14,6 +14,9 @@ resource "aws_cloudwatch_metric_alarm" "primary_web_unhealthy_hosts" {
   evaluation_periods  = 2
   threshold           = 1
   comparison_operator = "GreaterThanOrEqualToThreshold"
+  alarm_actions = [
+    "arn:aws:sns:ap-south-1:357558450991:three-tier-primary-alerts"
+  ]
 
   dimensions = {
     LoadBalancer = aws_lb.public.arn_suffix
@@ -40,6 +43,9 @@ resource "aws_cloudwatch_metric_alarm" "primary_app_unhealthy_hosts" {
   evaluation_periods  = 2
   threshold           = 1
   comparison_operator = "GreaterThanOrEqualToThreshold"
+  alarm_actions = [
+    "arn:aws:sns:ap-south-1:357558450991:three-tier-primary-alerts"
+  ]
 
   dimensions = {
     LoadBalancer = aws_lb.internal.arn_suffix
@@ -66,6 +72,9 @@ resource "aws_cloudwatch_metric_alarm" "primary_rds_high_cpu" {
   evaluation_periods  = 5
   threshold           = 80
   comparison_operator = "GreaterThanOrEqualToThreshold"
+  alarm_actions = [
+    "arn:aws:sns:ap-south-1:357558450991:three-tier-primary-alerts"
+  ]
 
   dimensions = {
     DBInstanceIdentifier = aws_db_instance.primary.identifier
@@ -95,6 +104,9 @@ resource "aws_cloudwatch_metric_alarm" "primary_rds_low_storage" {
   evaluation_periods  = 2
   threshold           = 2147483648
   comparison_operator = "LessThanOrEqualToThreshold"
+  alarm_actions = [
+    "arn:aws:sns:ap-south-1:357558450991:three-tier-primary-alerts"
+  ]
 
   dimensions = {
     DBInstanceIdentifier = aws_db_instance.primary.identifier
