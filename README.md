@@ -57,6 +57,8 @@ Private Database Connectivity Test
 | Configuration and Secrets | AWS Systems Manager Parameter Store |
 | Disaster Recovery | RDS Snapshots, Cross-Region Snapshot Copy |
 | Infrastructure as Code | Terraform |
+| Monitoring | Amazon CloudWatch |
+| Notifications | Amazon SNS |
 | CLI | AWS CLI |
 
 ## Primary Region — Mumbai
@@ -85,29 +87,65 @@ Private Database Connectivity Test
 
 - DR Region: `ap-south-2`
 - DR VPC CIDR: `10.1.0.0/16`
-- Private database subnets.
-- Database security group and DB subnet group.
-- Encrypted cross-region RDS snapshot copy.
-- Restored MySQL database in Hyderabad.
-- Database connectivity and authentication tested successfully.
+- Public, web, application, and database subnets.
+- Internet Gateway and NAT Gateway.
+- Public and internal Application Load Balancers.
+- Web EC2 Auto Scaling Group with two instances.
+- Application EC2 Auto Scaling Group with two instances.
+- Restored private and encrypted RDS MySQL database.
+- Regional SSM Parameter Store configuration.
+- Security groups restrict database access to the application tier.
 
-**DR approach:** Backup and Restore.
+**DR strategy:** Backup and Restore with a pre-provisioned DR application environment.
 
-The current DR environment covers database restoration and connectivity testing. It does not yet include a complete web/application stack or automated failover.
+### DR Database Recovery
+
+1. Create a database snapshot from the Mumbai primary RDS instance.
+2. Copy the encrypted snapshot to Hyderabad.
+3. Restore an RDS instance from the copied snapshot.
+4. Verify database authentication and connectivity from the DR application tier.
 
 ## Recovery Validation
 
 The following tests were performed:
 
-- Primary application endpoints `/`, `/app/`, and `/db` returned HTTP 200.
-- Primary RDS instance reached Available status.
-- Encrypted RDS snapshot copied to Hyderabad.
-- DR RDS instance restored and reached Available status.
-- DR database remained private and encrypted.
-- MySQL authentication and connectivity tested from a temporary SSM-managed EC2 instance.
-- Temporary DR test infrastructure was removed after testing.
+- Mumbai and Hyderabad application endpoints `/`, `/app/`, and `/db` returned HTTP 200.
+- Web and application target groups reported healthy targets in both regions.
+- Application instances successfully connected to their respective RDS databases.
+- MySQL authentication and query execution were verified.
+- Cross-region RDS snapshot copy and database restoration were tested.
+- Manual endpoint switching from the Mumbai public ALB to the Hyderabad public ALB was tested.
+- All three DR application endpoints returned HTTP 200 after the endpoint switch.
 
-**Data recovery limitation:** The restored `appdb` database contained zero tables during validation. Database infrastructure restoration and connectivity were tested, but recovery of actual application table data has not yet been demonstrated.
+### RPO and RTO Test Notes
+
+A controlled database test record was inserted into the Mumbai primary database. It was not present in the older Hyderabad restored snapshot.
+
+This confirms that the restored snapshot did not include that later test record. It does not establish an exact measured RPO.
+
+A manual endpoint-switch drill took approximately four seconds. This measures the client-side endpoint-switch exercise only, not a complete regional disaster recovery RTO.
+
+**Limitations:** Automated failover and Route 53 failover are not implemented.
+
+## Monitoring and Email Notifications
+
+Amazon CloudWatch monitors the primary and DR environments.
+
+Four alarms are configured in each region:
+
+- Web target unhealthy hosts.
+- Application target unhealthy hosts.
+- RDS high CPU utilization.
+- RDS low free storage.
+
+Amazon SNS delivers email notifications through regional topics:
+
+- Mumbai: `three-tier-primary-alerts`
+- Hyderabad: `three-tier-dr-alerts`
+
+Both email subscriptions were confirmed, and test notification emails were successfully received from both regions.
+
+**Implementation note:** Mumbai CloudWatch alarm definitions are managed through Terraform. Hyderabad alarm configurations and SNS topic setup were performed using AWS CLI.
 
 ## Terraform Project Structure
 
@@ -119,6 +157,7 @@ aws-three-tier-dr/
 ├── providers.tf
 ├── variables.tf
 ├── locals.tf
+├── monitoring.tf
 ├── .terraform.lock.hcl
 ├── .gitignore
 ├── docs/
@@ -152,17 +191,21 @@ Review the Terraform plan carefully before applying changes.
 
 ## Project Status
 
-**Primary three-tier deployment:** Implemented and tested.
-
-**Cross-region database DR:** Snapshot copy, restore, and connectivity testing completed.
-
-**Remaining improvements:**
-- Deploy the web and application tiers in Hyderabad.
-- Demonstrate recovery of actual application database data.
-- Document and test the complete recovery runbook.
-- Measure Recovery Point Objective (RPO) and Recovery Time Objective (RTO).
-- Implement monitoring and alerting.
-- Configure HTTPS and a custom domain.
+| Feature | Status |
+|---|---|
+| Mumbai three-tier architecture | Deployed and tested |
+| Hyderabad DR network | Deployed |
+| Hyderabad web and application tiers | Deployed and tested |
+| Cross-region RDS snapshot copy | Tested |
+| DR RDS restoration | Tested |
+| Application-to-database connectivity | Tested in both regions |
+| CloudWatch monitoring | Configured in both regions |
+| SNS email notifications | Tested in both regions |
+| Manual DR endpoint-switch drill | Tested |
+| Automated regional failover | Not implemented |
+| Route 53 failover | Not implemented |
+| HTTPS and custom domain | Not implemented |
+| Exact measured RPO and full regional RTO | Not established |
 
 ## Cost Considerations
 
