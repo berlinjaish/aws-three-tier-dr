@@ -1,157 +1,160 @@
 # AWS Three-Tier Architecture with Cross-Region Disaster Recovery
 
-## Project Overview
+A highly available three-tier web application on AWS, provisioned with **Terraform** in Mumbai (`ap-south-1`), with a pre-provisioned cross-region Disaster Recovery (DR) environment in Hyderabad (`ap-south-2`).
 
-This project demonstrates a three-tier web application architecture on AWS, provisioned using Terraform, with a cross-region Disaster Recovery (DR) approach.
+---
 
-The primary application runs in Mumbai (`ap-south-1`). A backup-and-restore DR environment is configured in Hyderabad (`ap-south-2`).
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Technology Stack](#technology-stack)
+- [Primary Region: Mumbai](#primary-region-mumbai)
+- [Disaster Recovery Region: Hyderabad](#disaster-recovery-region-hyderabad)
+- [DR Recovery Process](#dr-recovery-process)
+- [Validation and Testing](#validation-and-testing)
+- [Monitoring and Notifications](#monitoring-and-notifications)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Security Practices](#security-practices)
+- [Project Status](#project-status)
+- [Known Limitations](#known-limitations)
+- [Cost Considerations and Cleanup](#cost-considerations-and-cleanup)
+- [Screenshots](#screenshots)
+- [Learning Outcomes](#learning-outcomes)
+- [Author](#author)
+
+---
+
+## Overview
+
+| Item | Details |
+|---|---|
+| Primary Region | Mumbai (`ap-south-1`) |
+| DR Region | Hyderabad (`ap-south-2`) |
+| Infrastructure as Code | Terraform |
+| DR Strategy | Backup and Restore with a pre-provisioned DR application environment |
+| Database | Amazon RDS MySQL 8.4 (private and encrypted) |
+
+This project demonstrates AWS network design, three-tier application deployment, secure configuration management, monitoring, and cross-region database recovery.
 
 ## Architecture
 
-![AWS Three-Tier Architecture](docs/architecture.png)
+The architecture consists of two AWS regions: Mumbai as the primary environment and Hyderabad as the disaster recovery environment.
 
-- **Primary Region:** Mumbai (`ap-south-1`)
-- **DR Region:** Hyderabad (`ap-south-2`)
-- **Infrastructure as Code:** Terraform
+![AWS Three-Tier Architecture with Cross-Region DR](docs/aws-three-tier-dr-architecture.jpeg)
 
-### Primary Architecture Flow
+Traffic flows from the public Application Load Balancer to the web tier, then through an internal Application Load Balancer to the application tier, which connects to a private RDS MySQL database.
 
-```text
-Internet
-   |
-Public Application Load Balancer
-   |
-Web EC2 Auto Scaling Group
-   |
-Internal Application Load Balancer
-   |
-Application EC2 Auto Scaling Group
-   |
-Amazon RDS MySQL
-```
+The Hyderabad DR environment contains the corresponding application infrastructure. Database recovery is performed through encrypted cross-region RDS snapshot copy and restore.
 
-### Disaster Recovery Flow
+## Technology Stack
 
-```text
-Mumbai Primary RDS
-       |
-Encrypted RDS Snapshot
-       |
-Cross-Region Snapshot Copy
-       |
-Hyderabad RDS Restore
-       |
-Private Database Connectivity Test
-```
-
-## AWS Services Used
-
-| Category | Services |
+| Category | Services and Tools |
 |---|---|
-| Networking | VPC, Subnets, Route Tables, Internet Gateway, NAT Gateway |
-| Compute | EC2 |
+| Networking | Amazon VPC, Subnets, Route Tables, Internet Gateway, NAT Gateway |
+| Compute | Amazon EC2, EBS |
 | Auto Scaling | EC2 Auto Scaling Groups |
 | Load Balancing | Public and Internal Application Load Balancers |
 | Database | Amazon RDS MySQL |
-| Security | IAM Roles, Security Groups, AWS KMS |
-| Configuration and Secrets | AWS Systems Manager Parameter Store |
-| Disaster Recovery | RDS Snapshots, Cross-Region Snapshot Copy |
-| Infrastructure as Code | Terraform |
+| Security | IAM, Security Groups, AWS KMS |
+| Configuration | AWS Systems Manager Parameter Store |
 | Monitoring | Amazon CloudWatch |
 | Notifications | Amazon SNS |
-| CLI | AWS CLI |
+| Storage | Amazon S3 |
+| Disaster Recovery | RDS Snapshots, Cross-Region Snapshot Copy |
+| Infrastructure as Code | Terraform |
+| Version Control | Git, GitHub |
+| Testing and CLI | AWS CLI, Bash, curl, Python, MySQL Client |
 
-## Primary Region — Mumbai
+## Primary Region: Mumbai
 
-- VPC CIDR: `10.0.0.0/16`
-- Public and private subnet architecture.
+- **VPC CIDR:** `10.0.0.0/16`
+- Public, web, application, and database subnets.
+- Internet Gateway and NAT Gateway.
 - Public Application Load Balancer.
-- Web EC2 Auto Scaling Group with two instances.
+- Web tier with two EC2 instances managed by Auto Scaling.
 - Internal Application Load Balancer.
-- Application EC2 Auto Scaling Group with two instances.
-- Amazon RDS MySQL in private database subnets.
-- NAT Gateway for outbound connectivity.
-- Database password stored in Systems Manager Parameter Store as SecureString.
-- IAM instance roles for AWS access.
+- Application tier with two Python EC2 instances managed by Auto Scaling.
+- Private Amazon RDS MySQL database.
+- IAM instance roles and SSM Parameter Store `SecureString` for database credentials.
+- CloudWatch monitoring and SNS notifications.
 
 ### Primary RDS Configuration
 
-- Engine: MySQL 8.4
-- Instance class: `db.t3.micro`
-- Storage: 20 GiB gp3
-- Encryption: Enabled
-- Public access: Disabled
-- Deployment: Single-AZ
+| Setting | Value |
+|---|---|
+| Engine | MySQL 8.4 |
+| Instance class | `db.t3.micro` |
+| Storage | 20 GiB gp3 |
+| Encryption | Enabled |
+| Public access | Disabled |
+| Deployment | Single-AZ |
 
-## Disaster Recovery — Hyderabad
+## Disaster Recovery Region: Hyderabad
 
-- DR Region: `ap-south-2`
-- DR VPC CIDR: `10.1.0.0/16`
-- Public, web, application, and database subnets.
+- **VPC CIDR:** `10.1.0.0/16`
+- Separate public, web, application, and database subnets.
 - Internet Gateway and NAT Gateway.
 - Public and internal Application Load Balancers.
-- Web EC2 Auto Scaling Group with two instances.
-- Application EC2 Auto Scaling Group with two instances.
-- Restored private and encrypted RDS MySQL database.
+- Web tier with two EC2 instances managed by Auto Scaling.
+- Application tier with two EC2 instances managed by Auto Scaling.
+- Recovered private and encrypted RDS MySQL database.
 - Regional SSM Parameter Store configuration.
-- Security groups restrict database access to the application tier.
+- CloudWatch alarms and SNS email notifications.
 
-**DR strategy:** Backup and Restore with a pre-provisioned DR application environment.
-
-### DR Database Recovery
+## DR Recovery Process
 
 1. Create a database snapshot from the Mumbai primary RDS instance.
 2. Copy the encrypted snapshot to Hyderabad.
 3. Restore an RDS instance from the copied snapshot.
 4. Verify database authentication and connectivity from the DR application tier.
+5. Switch the application endpoint manually for DR testing.
 
-## Recovery Validation
+## Validation and Testing
 
 The following tests were performed:
 
-- Mumbai and Hyderabad application endpoints `/`, `/app/`, and `/db` returned HTTP 200.
+- Mumbai and Hyderabad endpoints `/`, `/app/`, and `/db` returned **HTTP 200**.
 - Web and application target groups reported healthy targets in both regions.
-- Application instances successfully connected to their respective RDS databases.
+- Application instances connected successfully to their respective RDS databases.
 - MySQL authentication and query execution were verified.
 - Cross-region RDS snapshot copy and database restoration were tested.
-- Manual endpoint switching from the Mumbai public ALB to the Hyderabad public ALB was tested.
-- All three DR application endpoints returned HTTP 200 after the endpoint switch.
+- Manual endpoint switching from Mumbai to Hyderabad was tested, and DR endpoints returned HTTP 200 afterward.
+- Terraform formatting and validation completed successfully.
+- SNS test notification emails were received from both regions.
 
 ### RPO and RTO Test Notes
 
-A controlled database test record was inserted into the Mumbai primary database. It was not present in the older Hyderabad restored snapshot.
+- A controlled test record inserted into the Mumbai primary database was **not present** in the older Hyderabad restored snapshot. This confirms that the snapshot did not contain the later record; it does **not** establish an exact measured RPO.
+- A manual endpoint-switch exercise took approximately **four seconds**. This is not a measurement of complete regional disaster recovery RTO.
 
-This confirms that the restored snapshot did not include that later test record. It does not establish an exact measured RPO.
+## Monitoring and Notifications
 
-A manual endpoint-switch drill took approximately four seconds. This measures the client-side endpoint-switch exercise only, not a complete regional disaster recovery RTO.
+Four CloudWatch alarms are configured in each region:
 
-**Limitations:** Automated failover and Route 53 failover are not implemented.
+| Alarm | Purpose |
+|---|---|
+| Web target unhealthy hosts | Detects failing web tier targets |
+| Application target unhealthy hosts | Detects failing application tier targets |
+| RDS high CPU utilization | Flags database load |
+| RDS low free storage | Flags database storage risk |
 
-## Monitoring and Email Notifications
+Alerts are delivered by email through regional SNS topics:
 
-Amazon CloudWatch monitors the primary and DR environments.
+| Region | SNS Topic |
+|---|---|
+| Mumbai | `three-tier-primary-alerts` |
+| Hyderabad | `three-tier-dr-alerts` |
 
-Four alarms are configured in each region:
+Both subscriptions were confirmed and test emails were received.
 
-- Web target unhealthy hosts.
-- Application target unhealthy hosts.
-- RDS high CPU utilization.
-- RDS low free storage.
+> **Implementation note:** Mumbai CloudWatch alarms are managed through Terraform. Hyderabad alarms and SNS topic setup were created using the AWS CLI.
 
-Amazon SNS delivers email notifications through regional topics:
-
-- Mumbai: `three-tier-primary-alerts`
-- Hyderabad: `three-tier-dr-alerts`
-
-Both email subscriptions were confirmed, and test notification emails were successfully received from both regions.
-
-**Implementation note:** Mumbai CloudWatch alarm definitions are managed through Terraform. Hyderabad alarm configurations and SNS topic setup were performed using AWS CLI.
-
-## Terraform Project Structure
+## Project Structure
 
 ```text
 aws-three-tier-dr/
-│
 ├── main.tf
 ├── dr.tf
 ├── providers.tf
@@ -161,12 +164,20 @@ aws-three-tier-dr/
 ├── .terraform.lock.hcl
 ├── .gitignore
 ├── docs/
-│   └── architecture.png
+│   └── aws-three-tier-dr-architecture.jpeg
 ├── screenshots/
 └── README.md
 ```
 
-## Deployment Commands
+## Getting Started
+
+### Prerequisites
+
+- An AWS account with sufficient permissions to create the required resources.
+- [Terraform](https://developer.hashicorp.com/terraform/install) installed.
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed and configured.
+
+### Deploy
 
 Run these commands from the Terraform project directory:
 
@@ -178,16 +189,24 @@ terraform plan
 terraform apply
 ```
 
-Review the Terraform plan carefully before applying changes.
+> Review the Terraform plan carefully before applying changes.
+
+### Clean Up
+
+```bash
+terraform destroy
+```
+
+**Important:** Resources created outside Terraform, including Hyderabad CloudWatch alarms, SNS resources, and manual snapshots, may need separate cleanup. Verify all dependencies before deleting anything.
 
 ## Security Practices
 
-- Use IAM roles instead of hardcoding AWS credentials.
-- Store database passwords in SSM Parameter Store SecureString.
+- Use IAM roles instead of hardcoded AWS credentials.
+- Store database passwords in SSM Parameter Store `SecureString`.
 - Keep databases in private subnets.
-- Restrict traffic using security groups.
+- Restrict network traffic with Security Groups.
 - Encrypt RDS databases and snapshots.
-- Do not commit credentials, `.tfvars` files, Terraform state files, or plan files to GitHub.
+- Never commit credentials, `.tfvars`, Terraform state files, or plan files to GitHub.
 
 ## Project Status
 
@@ -198,35 +217,78 @@ Review the Terraform plan carefully before applying changes.
 | Hyderabad web and application tiers | Deployed and tested |
 | Cross-region RDS snapshot copy | Tested |
 | DR RDS restoration | Tested |
-| Application-to-database connectivity | Tested in both regions |
-| CloudWatch monitoring | Configured in both regions |
-| SNS email notifications | Tested in both regions |
+| Application-to-database connectivity | Tested |
+| CloudWatch monitoring | Configured |
+| SNS email notifications | Tested |
 | Manual DR endpoint-switch drill | Tested |
 | Automated regional failover | Not implemented |
 | Route 53 failover | Not implemented |
 | HTTPS and custom domain | Not implemented |
 | Exact measured RPO and full regional RTO | Not established |
 
-## Cost Considerations
+## Known Limitations
 
-AWS resources such as EC2, NAT Gateway, Application Load Balancers, RDS, snapshots, public IPv4 addresses, and cross-region data transfer may incur charges.
+- Failover is **manual**; automated failover and Route 53 failover are not implemented.
+- HTTPS and a custom domain are not configured.
+- RPO and full regional RTO have not been formally measured.
+- The primary database is Single-AZ.
+- Hyderabad alarms and SNS were configured using AWS CLI, not Terraform.
 
-Review and clean up resources when they are no longer needed.
+### Possible Future Improvements
+
+- Route 53 health checks with failover routing.
+- HTTPS using AWS Certificate Manager (ACM) and a custom domain.
+- Multi-AZ RDS for the primary database.
+- Automated, scheduled cross-region snapshot copy.
+- Bring Hyderabad alarms and SNS under Terraform management.
+- Formal RPO and RTO measurement.
+
+## Cost Considerations and Cleanup
+
+EC2, NAT Gateways, Application Load Balancers, RDS, snapshots, public IPv4 addresses, and cross-region data transfer may incur AWS charges.
+
+Review costs regularly and clean up resources when they are no longer needed.
+
+## Screenshots
+
+The `screenshots/` folder contains implementation and validation evidence.
+
+| No. | Evidence |
+|---|---|
+| 01–02 | Mumbai and Hyderabad VPCs |
+| 03–04 | Subnets |
+| 05–06 | Route Tables |
+| 07–10 | Internet and NAT Gateways |
+| 11–12 | Security Groups |
+| 13–16 | Public and Internal Load Balancers |
+| 17–18 | EC2 Instances |
+| 19–20 | Auto Scaling Groups |
+| 21–24 | Target Groups |
+| 25–27 | Primary, DR, and Recovered RDS |
+| 28–29 | CloudWatch Alarms |
+| 30–31 | SNS Subscriptions |
+| 32 | Primary and DR Connectivity Test |
+| 33 | Manual Failover Test |
+| 34 | Database Recovery Validation |
+| 35 | Terraform Validation |
+| 36 | GitHub Repository |
+
+[Browse all project screenshots](screenshots/)
 
 ## Learning Outcomes
 
 - AWS VPC and subnet design.
-- Public and private network architecture.
 - Three-tier application deployment.
 - EC2 Auto Scaling and load balancing.
-- Amazon RDS MySQL configuration.
+- RDS MySQL configuration.
 - IAM and secure parameter management.
 - Terraform infrastructure provisioning.
-- Cross-region RDS snapshot copy and restore.
+- Cross-region snapshot copy and restore.
+- CloudWatch monitoring and SNS notifications.
 - Disaster Recovery validation.
 
 ## Author
 
-Berlin
+**Berlin**
 
 AWS | Terraform | DevOps | Cloud Infrastructure | Disaster Recovery
